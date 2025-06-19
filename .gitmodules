@@ -1,0 +1,3 @@
+[submodule "zenoh_python_command"]
+	path = zenoh_python_command
+	url = https://github.com/liuzhiyuan562/zenoh_python_command.git

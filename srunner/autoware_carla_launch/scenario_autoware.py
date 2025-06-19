@@ -95,12 +95,13 @@ class PoseServer:
         self.session = session
         self.vehicles = {}
     
-    def find_vehicles(self, time=10):
+    def find_vehicles(self, times=10):
         for scope, vehicle in self.vehicles.items():
             vehicle.publisher_gate_mode.undeclare()
 
         self.vehicles = {}
-        for _ in range(time):
+        # for _ in range(times):
+        while len(self.vehicles) == 0:
             replies = self.session.get('@/**/ros2/**' + GET_POSE_KEY_EXPR)
             for reply in replies:
                 key_expr = str(reply.ok.key_expr)
@@ -109,6 +110,8 @@ class PoseServer:
                     vehicle = key_expr[:end].split('/')[-1]
                     print(f'find vehicle {vehicle}')
                     self.vehicles[vehicle] = None
+            print('Waiting for vehicles to publish their pose...')
+            time.sleep(3)
         self.construct_vehicle()
     def construct_vehicle(self):
         for scope in self.vehicles.keys():
@@ -116,7 +119,7 @@ class PoseServer:
 
 
 if __name__ == '__main__':
-    conf = zenoh.Config.from_file('/home/zy/autoware_carla_launch/k8s/zenoh_autoware_fms/config.json5')
+    conf = zenoh.Config.from_file('config.json5')
     session = zenoh.open(conf)
     pose_server = PoseServer(session)
     pose_server.find_vehicles()

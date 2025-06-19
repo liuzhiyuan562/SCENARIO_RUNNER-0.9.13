@@ -1,0 +1,57 @@
+FROM carlasim/carla:0.9.14
+
+USER root
+RUN apt-get update && \
+    apt-get install -y \
+    wget \
+    libjpeg8 \
+    libjpeg8-dev \
+    libtiff5-dev \
+    git
+
+USER carla
+
+SHELL ["/bin/bash", "-c"]
+
+ENV CARLA_ROOT=/home/carla
+ENV PYTHONPATH=/home/carla/PythonAPI/carla/dist/carla-0.9.14-py3.7-linux-x86_64.egg:/home/carla/PythonAPI/carla
+
+# Install scenario_runner, zenoh_python_command and miniconda
+# the first sed is fix the error of numpy
+# the second sed is change the carla ego vehicle name, so that autoware can find the carla ego vehicle
+RUN wget "https://github.com/carla-simulator/scenario_runner/archive/refs/tags/v0.9.13.tar.gz" -O ~/scenario_runner-0.9.13.tar.gz && \
+    tar -zxf ~/scenario_runner-0.9.13.tar.gz && \
+    rm ~/scenario_runner-0.9.13.tar.gz && \
+    wget "https://github.com/liuzhiyuan562/zenoh_python_command/archive/refs/tags/0.3.1.tar.gz" -O ~/zenoh_python_command.tar.gz && \
+    mkdir -p ~/zenoh_python_command && \
+    tar -zxf ~/zenoh_python_command.tar.gz -C ~/zenoh_python_command --strip-components=1 && \
+    rm ~/zenoh_python_command.tar.gz && \
+    mkdir -p ~/miniconda3 && \
+    wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda3/miniconda.sh && \
+    bash ~/miniconda3/miniconda.sh -b -u -p ~/miniconda3 && \
+    rm ~/miniconda3/miniconda.sh && \
+    source ~/miniconda3/bin/activate && \
+    conda init --all && \
+    conda create -n scenario-runner-0913-py38 python=3.8 -y && \
+    conda activate scenario-runner-0913-py38 && \
+    conda install numpy==1.24.3 && \
+    pip install xmlschema==1.0.18 six==1.16.0 py_trees==0.8.3 ephem==4.1.5 networkx==2.2 shapely==1.7.1 tabulate==0.9.0 simple_watchdog_timer==0.1.1 pygame==2.6.1 && \
+    sed -i 's/(np.int, "int")/(int, "int")/g' /home/carla/miniconda3/envs/scenario-runner-0913-py38/lib/python3.8/site-packages/networkx/readwrite/graphml.py && \
+    sed -i 's/hero/autoware_hero/g' /home/carla/scenario_runner-0.9.13/srunner/tools/scenario_parser.py && \
+    pip install -r ~/zenoh_python_command/requirements.txt && \
+    cd ~/zenoh_python_command/ && \
+    mv ~/zenoh_python_command/simulation/ ~/scenario_runner-0.9.13/srunner/ && \
+    bash ./download_map.sh && \
+    cd ~
+
+
+SHELL ["/bin/bash", "-l", "-c"]
+COPY ./scenario_app.py /home/carla/scenario_app.py
+RUN source ~/miniconda3/bin/activate && \
+    conda activate scenario-runner-0913-py38 && \
+    pip install fastapi uvicorn psutil python-multipart
+
+ENV SCENARIO_RUNNER_ROOT=/home/carla/scenario_runner-0.9.13
+
+CMD ["/bin/bash", "-c", "source ~/miniconda3/bin/activate && conda activate scenario-runner-0913-py38 && source ~/zenoh_python_command/env.sh && uvicorn scenario_app:app --host 0.0.0.0 --port 5621"]
+

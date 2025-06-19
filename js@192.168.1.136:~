@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scenario-runner-0913-vnc
+  labels:
+    app: scenario-runner-0913-vnc
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: scenario-runner-0913-vnc
+  template:
+    metadata:
+      labels:
+        app: scenario-runner-0913-vnc
+    spec:
+      volumes:
+        - name: x11-socket
+          emptyDir: {}
+      containers:
+        - name: novnc
+          image: theasp/novnc
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              name: novnc-web
+          volumeMounts:
+            - name: x11-socket
+              mountPath: /tmp/.X11-unix
+        - name: scenario-runner-0913
+          image: 2256906828/scenario_runner_0913:0.2.0
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            privileged: true
+          env:
+            - name: DISPLAY
+              value: ":1"
+          resources:
+            limits:
+              memory: 16Gi
+              nvidia.com/gpu: 2
+          ports:
+            - containerPort: 5621
+              name: scenario-runner-0913
+          volumeMounts:
+            - name: x11-socket
+              mountPath: /tmp/.X11-unix
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: scenario-runner-0913-vnc
+  labels:
+    app: scenario-runner-0913-vnc
+spec:
+  selector:
+    app: scenario-runner-0913-vnc
+  ports:
+    - name: novnc-web
+      port: 5624
+      targetPort: 8080
+    - name: scenario-runner-0913
+      port: 5621
+      targetPort: 5621
+  type: NodePort
+
